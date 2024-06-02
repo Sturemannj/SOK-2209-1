@@ -1,0 +1,333 @@
+---
+title: "SOK-2209-1"
+author: "Vebjørn Støre"
+date: "2024-05-20"
+output:
+  word_document: default
+  pdf_document: default
+  latex_engine: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r message=FALSE, warning=FALSE}
+
+Sys.setlocale("LC_ALL", "Norwegian")
+
+
+# Rydd opp workspace
+rm(list = ls())
+
+# Laste inn nødvendige pakker
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(car)
+})
+
+# Les inn data (endre sti til din faktiske filsti)
+data <- read.csv("C:/Users/vebiz/Desktop/NSD3127.csv")
+
+```
+
+
+```{r}
+# politisk interesse
+data$politisk_interesse <- data$r26_pcpin
+
+# Filtrere ut observasjoner 
+data1 <- subset(data, politisk_interesse != 97 & politisk_interesse != 98)
+
+table(data1$politisk_interesse)
+# Kjønnsdummy (1 for mann, 0 for kvinne)
+data1$mann <- ifelse(data1$r26P1 == 1, 1, 0)
+
+# Definerer aldersgrupper
+data1 <- data1 %>%
+  mutate(født = case_when(
+    r26P5_2 == 1 ~ '1959_og_før',
+    r26P5_2 == 2 ~ '1960_1989',
+    TRUE ~ '1990_og_etter'
+  )) %>%
+  mutate(født = factor(født, levels = c('1959_og_før', '1960_1989', '1990_og_etter')))
+
+# Utdanning
+data1 <- data1 %>%
+  mutate(utdanning = factor(r26P4_2,
+                            levels = 1:12,
+                            labels = c("Ingen fullført utdanning", "Grunnskole", 
+                                       "Videregående - allmennfag", "Videregående - yrkesfag",
+                                       "Vitnemål fra påbygging", "Høgskole 3 år",
+                                       "Høgskole 3-4 år", "Universitet 3-4 år", 
+                                       "Høgskole 5-6 år", "Universitet 5-6 år", 
+                                       "Forskernivå", "Annen utdanning")))
+
+table(data1$utdanning)
+
+# Inntekt
+data1 <- data1 %>%
+  mutate(inntekt = factor(r26k2_bginc,
+                          levels = 1:8,   # Anta at det er 8 inntektskategorier
+                          labels = c("Under 150", "150-250", "251-350", "351-450", "451-550", "551-650", "651-750", "Over 750"),
+                          exclude = c(97, 98)))  # Ekskluder manglende data
+
+```
+
+
+
+
+
+
+
+```{r message=FALSE, warning=FALSE, paged.print=TRUE}
+ #Redusert datasett for første analyse
+reduced_data <- data1 %>%
+  dplyr::select(politisk_interesse, utdanning)
+
+# Utvidet datasett for andre analyse
+extended_data <- data1 %>%
+  dplyr::select(politisk_interesse, utdanning, mann, inntekt, født)
+
+# Utfør første regresjonsanalyse (bare utdanning)
+model_1 <- lm(politisk_interesse ~ utdanning, data = reduced_data)
+summary(model_1)
+
+# Utfør andre regresjonsanalyse (utdanning, kjønn, inntekt og alder)
+model_2 <- lm(politisk_interesse ~ utdanning + mann + inntekt + født, data = extended_data)
+summary(model_2)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# Beregn gjennomsnitt og standardavvik for 'politisk_interesse'
+mean_politisk_interesse <- mean(reduced_data$politisk_interesse, na.rm = TRUE)
+sd_politisk_interesse <- sd(reduced_data$politisk_interesse, na.rm = TRUE)
+
+# Skrive ut resultater
+cat("Gjennomsnitt for politisk interesse:", mean_politisk_interesse, "\n")
+cat("Standardavvik for politisk interesse:", sd_politisk_interesse, "\n")
+
+# Prosentvis fordeling av kategoriske variabler
+cat("Prosentvis fordeling av kjønn:\n")
+print(table(extended_data$mann) / nrow(extended_data) * 100)
+
+cat("Prosentvis fordeling av født:\n")
+print(table(extended_data$født) / nrow(extended_data) * 100)
+
+cat("Prosentvis fordeling av utdanning:\n")
+print(table(extended_data$utdanning) / nrow(extended_data) * 100)
+
+cat("Prosentvis fordeling av inntekt:\n")
+print(table(extended_data$inntekt) / nrow(extended_data) * 100)
+```
+
+
+```{r message=FALSE, warning=FALSE, paged.print=TRUE}
+# Lineær regresjonsmodell
+model_1 <- lm(politisk_interesse ~ utdanning, data = reduced_data)
+summary(model_1)
+
+```
+
+
+```{r}
+# Plott av diagnostiske grafer for hovedmodellen (politisk_interesse ~ utdanning)
+# Åpne en PNG-fil for å lagre det første plottet
+png("plot_model1_1.png")
+plot(model_1, which = 1)
+dev.off()  # Lukker filen og lagrer plottet
+
+# Gjenta for hvert av de fire plottene
+png("plot_model1_2.png")
+plot(model_1, which = 2)
+dev.off()
+
+png("plot_model1_3.png")
+plot(model_1, which = 3)
+dev.off()
+
+png("plot_model1_4.png")
+plot(model_1, which = 4)
+dev.off()
+```
+
+```{r}
+# Plott av diagnostiske grafer for den utvidede modellen (politisk_interesse ~ utdanning + mann + inntekt + født)
+# Åpne en PNG-fil for å lagre det første plottet
+png("plot_model2_1.png")
+plot(model_2, which = 1)
+dev.off()  # Lukker filen og lagrer plottet
+
+# Gjenta for hvert av de fire plottene
+png("plot_model2_2.png")
+plot(model_2, which = 2)
+dev.off()
+
+png("plot_model2_3.png")
+plot(model_2, which = 3)
+dev.off()
+
+png("plot_model2_4.png")
+plot(model_2, which = 4)
+dev.off()
+```
+
+```{r}
+# Vis diagnostiske grafer for model_1
+plot(model_1, which = 1)
+plot(model_1, which = 2)
+plot(model_1, which = 3)
+plot(model_1, which = 4)
+```
+
+```{r}
+# Vis diagnostiske grafer for model_2
+plot(model_2, which = 1)
+plot(model_2, which = 2)
+plot(model_2, which = 3)
+plot(model_2, which = 4)
+```
+
+```{r}
+# Sjekk multikollinearitet for den utvidede modellen
+vif(model_2)
+```
+
+
+
+```{r}
+data1 <- data1 %>%
+  mutate(kjønn = ifelse(mann == 1, "Mann", "Kvinne"))
+table(data1$kjønn)
+```
+
+
+
+
+
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+# Sørg for at data er renset fra NA i relevante kolonner
+data1 <- data1 %>%
+  filter(!is.na(politisk_interesse), !is.na(kjønn), !is.na(utdanning))  # Fjerner NA i politisk_interesse, kjønn og utdanning
+
+# Filtrerer ut utdanningsnivåer som ikke skal være med i plottet (kun de nivåene fra 1 til 8)
+data1 <- data1 %>%
+  filter(utdanning %in% c("Ingen fullført utdanning", "Grunnskole", "Videregående - allmennfag", 
+                          "Videregående - yrkesfag", "Vitnemål fra påbygging", "Høgskole 3 år", 
+                          "Høgskole 3-4 år", "Universitet 3-4 år", "Høgskole 5-6 år", "Universitet 5-6 år", "Forskernivå"))
+
+# Sjekk antall observasjoner per utdanningsnivå for å sikre at det finnes data for alle nivåer
+table(data1$utdanning)
+
+# Plott dataene med density plot for å vise fordelingen av politisk interesse etter utdanningsnivå
+ggplot(data1, aes(x = politisk_interesse, fill = kjønn, color = kjønn)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ utdanning, scales = "free_y") +  # Bruker free_y for å tilpasse tetthetsakselen individuelt for hver utdanning
+  labs(title = "Fordelingsplot av Politisk Interesse etter Utdanningsnivå",
+       x = "Politisk Interesse",
+       y = "Tetthet") +
+  theme_minimal()
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+# Sørg for at data er renset fra NA i relevante kolonner
+data1 <- data1 %>%
+  filter(!is.na(inntekt), !is.na(politisk_interesse), !is.na(mann))  # Sørg for at det ikke er NA i viktige kolonner
+
+# Legg til beskrivende kjønn variabel
+data1 <- data1 %>%
+  mutate(kjønn = ifelse(mann == 1, "Mann", "Kvinne"))
+
+# Grupper data etter 'inntekt' og 'kjønn', og beregn gjennomsnittlig interesse
+agg_data_inntekt <- data1 %>%
+  group_by(inntekt, kjønn) %>%
+  summarise(gjennomsnitt_interesse = mean(politisk_interesse, na.rm = TRUE))  # na.rm = TRUE fjerner NA fra beregningene
+
+# Sjekk resultatet
+print(agg_data_inntekt)
+
+# Plott de aggregerte dataene hvis det er gyldige data tilgjengelig
+if(nrow(agg_data_inntekt) > 0) {
+  ggplot(agg_data_inntekt, aes(x = inntekt, y = gjennomsnitt_interesse, fill = kjønn)) +
+    geom_col(position = "dodge") +  # Bruk 'dodge' for å skille søylene for hvert kjønn
+    scale_fill_brewer(palette = "Paired") +
+    labs(title = "Gjennomsnittlig Politisk Interesse etter Inntektsnivå og Kjønn",
+         x = "Inntektsnivå",
+         y = "Gjennomsnittlig Politisk Interesse") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+} else {
+  print("Ingen gyldige data tilgjengelig for plotting.")
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+# Sørg for at data er renset fra NA i relevante kolonner
+data1 <- data1 %>%
+  filter(!is.na(inntekt), !is.na(utdanning), !is.na(politisk_interesse))  # Sørg for at det ikke er NA i viktige kolonner
+
+# Legg til beskrivende kjønn variabel
+data1 <- data1 %>%
+  mutate(kjønn = ifelse(mann == 1, "Mann", "Kvinne"))
+
+# Plott dataene med boxplot for å vise fordelingen av politisk interesse etter inntektsnivå og utdanningsnivå
+ggplot(data1, aes(x = inntekt, y = politisk_interesse, fill = utdanning)) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Paired") +
+  facet_wrap(~ utdanning) +
+  labs(title = "Politisk Interesse etter Inntektsnivå og Utdanningsnivå",
+       x = "Inntektsnivå",
+       y = "Politisk Interesse") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
